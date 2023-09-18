@@ -12,25 +12,25 @@ import { products } from '@prisma/client';
 
 @Controller('/api/products')
 export class ProductsController {
-  constructor(private readonly todoService: ProductsService) {}
+  constructor(private readonly ProductsService: ProductsService) {}
   @Get()
   async getAllTodo(): Promise<products[]> {
-    return this.todoService.getAllProducts();
+    return this.ProductsService.getAllProducts();
   }
   @Post()
   async createTodo(@Body() postData: products): Promise<products> {
-    return this.todoService.createProduct(postData);
+    return this.ProductsService.createProduct(postData);
   }
   @Get(':id')
   async getTodo(@Param('id') id: number): Promise<products | null> {
-    return this.todoService.getProduct(id);
+    return this.ProductsService.getProduct(id);
   }
   @Put(':id')
   async Update(@Param('id') id: number): Promise<products> {
-    return this.todoService.updateProduct(id);
+    return this.ProductsService.updateProduct(id);
   }
   @Delete(':id')
   async Delete(@Param('id') id: number): Promise<products> {
-    return this.todoService.deleteProduct(id);
+    return this.ProductsService.deleteProduct(id);
   }
 }
