@@ -7,16 +7,48 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model products {
-  id             Int    @id @default(autoincrement())
+model User {
+  id       Int     @id @default(autoincrement())
+  username String
+  orders   Order[]
+}
+
+model Category {
+  id       Int       @id @default(autoincrement())
+  title    String
+  products Product[]
+}
+
+model Product {
+  id             Int      @id @default(autoincrement())
   title          String
   category_id    Int
+  category       Category @relation(fields: [category_id], references: [id])
   author         String
   list_price     Float
   stock_quantity Int
+  orders         Order[]
 }
 
-model categories {
-  id    Int    @id @default(autoincrement())
-  title String
+model Order {
+  id                     Int       @id @default(autoincrement())
+  price_without_discount Float
+  discounted_price       Float
+  campaign_id            Int?
+  campaign               Campaign? @relation(fields: [campaign_id], references: [id])
+  user_id                Int
+  user                   User      @relation(fields: [user_id], references: [id])
+  products               Product[]
+}
+
+model Campaign {
+  id                    Int     @id @default(autoincrement())
+  description           String
+  min_purchase_price    Float?
+  min_purchase_quantity Int?
+  discount_quantity     Int?
+  discount_percent      Int?
+  rule_author           String?
+  rule_category         String?
+  orders                Order[]
 }
