@@ -33,7 +33,7 @@ $ npm start
 - Create order
 
 ```
-POST http://localhost:3000/api/orders
+POST /api/orders
 # Example
 {
     "user_id": 1,
@@ -44,23 +44,23 @@ POST http://localhost:3000/api/orders
 - Get an order by id
 
 ```
-GET http://localhost:3000/api/orders/{id}
+GET /api/orders/{id}
 ```
 
 - Get all orders
 
 ```
-GET http://localhost:3000/api/orders
+GET /api/orders
 ```
 
 - Get all campaigns
 
 ```
-GET http://localhost:3000/api/campaigns
+GET /api/campaigns
 ```
 
 - Get all users
 
 ```
-GET http://localhost:3000/api/users
+GET /api/users
 ```
