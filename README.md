@@ -2,10 +2,12 @@
 
 ## Installation
 
-With docker: 
-
-- Change environment variables in .env file \
-- Run \
+- Clone repository
+```bash
+$ git clone https://github.com/ebubekirgungor/nestjs-siparis-api.git
+```
+- Change environment variables in .env file
+- Run
 ```bash
 # Install dependencies
 $ npm install
