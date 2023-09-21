@@ -144,8 +144,6 @@ export class OrderController {
       });
     }
 
-    console.log(discounted_prices);
-
     let min_discounted_campaign = discounted_prices.reduce(
       (min_campaign, current_campaign) => {
         if (
@@ -158,7 +156,7 @@ export class OrderController {
       },
       null,
     );
-    console.log(min_discounted_campaign);
+
     if (discounted_prices.length == 0) {
       min_discounted_campaign = {
         discounted_price: total_price,
