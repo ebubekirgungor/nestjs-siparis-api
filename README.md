@@ -12,7 +12,7 @@ $ git clone https://github.com/ebubekirgungor/nestjs-siparis-api.git
 # Install dependencies
 $ npm install
 # Run PostgreSql and Redis using docker
-$ docker compose up
+$ docker compose up -d
 # Migrate database
 $ npx prisma migrate dev --name init
 # Seed database
