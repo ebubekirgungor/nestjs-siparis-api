@@ -7,30 +7,54 @@ import {
   Put,
   Delete,
 } from '@nestjs/common';
-import { ProductService } from './product.service';
 import { Product } from '@prisma/client';
+import { PrismaService } from 'src/prisma.service';
 
 @Controller('/api/products')
 export class ProductController {
-  constructor(private readonly ProductService: ProductService) {}
+  constructor(private readonly prisma: PrismaService) {}
   @Get()
   async getAllProducts(): Promise<Product[]> {
-    return this.ProductService.getAllProducts();
+    return this.prisma.product.findMany({
+      include: {
+        category: {
+          select: {
+            title: true,
+          },
+        },
+      },
+    });
   }
   @Post()
-  async createProduct(@Body() postData: Product): Promise<Product> {
-    return this.ProductService.createProduct(postData);
+  async createProduct(@Body() data: Product): Promise<Product> {
+    return this.prisma.product.create({
+      data,
+    });
   }
   @Get(':id')
   async getProduct(@Param('id') id: number): Promise<Product | null> {
-    return this.ProductService.getProduct(id);
+    return this.prisma.product.findUnique({
+      where: { id: Number(id) },
+      include: {
+        category: {
+          select: {
+            title: true,
+          },
+        },
+      },
+    });
   }
   @Put(':id')
   async Update(@Param('id') id: number): Promise<Product> {
-    return this.ProductService.updateProduct(id);
+    return this.prisma.product.update({
+      where: { id: Number(id) },
+      data: {},
+    });
   }
   @Delete(':id')
   async Delete(@Param('id') id: number): Promise<Product> {
-    return this.ProductService.deleteProduct(id);
+    return this.prisma.product.delete({
+      where: { id: Number(id) },
+    });
   }
 }

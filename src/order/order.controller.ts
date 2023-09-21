@@ -6,26 +6,75 @@ import {
   Body,
   Put,
   Delete,
+  HttpException,
+  HttpStatus,
+  Inject,
 } from '@nestjs/common';
-import { OrderService } from './order.service';
-import { CampaignService } from '../campaign/campaign.service';
+import { PrismaService } from 'src/prisma.service';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 import { Order } from '@prisma/client';
 import { OrderDto } from './order.dto';
-import { PrismaService } from 'src/prisma.service';
+import {
+  get_available_campaigns,
+  get_discounted_total_price,
+} from './order.functions';
+
+const shipping_cost: number = 35;
 
 @Controller('/api/orders')
 export class OrderController {
   constructor(
-    private readonly OrderService: OrderService,
-    private readonly CampaignService: CampaignService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
     private readonly prisma: PrismaService,
+    @InjectQueue('order-queue') private queue: Queue,
   ) {}
   @Get()
   async getAllOrders(): Promise<Order[]> {
-    return this.OrderService.getAllOrders();
+    return this.prisma.order.findMany({
+      include: {
+        user: {
+          select: {
+            username: true,
+          },
+        },
+        campaign: {
+          select: {
+            description: true,
+          },
+        },
+        products: {
+          include: {
+            category: {
+              select: {
+                title: true,
+              },
+            },
+          },
+        },
+      },
+    });
   }
   @Post()
   async createOrder(@Body() OrderDto: OrderDto): Promise<Order> {
+    const user = await this.prisma.user.findUnique({
+      where: {
+        id: OrderDto.user_id,
+      },
+    });
+
+    if (!user) {
+      throw new HttpException(
+        {
+          status: HttpStatus.NOT_FOUND,
+          error: 'User not found',
+        },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
     await this.prisma.product.updateMany({
       where: {
         id: {
@@ -54,127 +103,41 @@ export class OrderController {
       },
     });
 
-    const campaigns = await this.prisma.campaign.findMany();
+    if (products.length != OrderDto.product_ids.length) {
+      throw new HttpException(
+        {
+          status: HttpStatus.NOT_FOUND,
+          error:
+            OrderDto.product_ids.length -
+            products.length +
+            ' of the products were not found',
+        },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    let campaigns = await this.cacheManager.get('campaigns');
+    if (!campaigns) {
+      campaigns = await this.prisma.campaign.findMany();
+      await this.cacheManager.set('campaigns', campaigns, 30000);
+    }
 
     let total_price = products.reduce((total, product) => {
       return total + product.list_price;
     }, 0);
 
-    let available_campaigns = [];
-    if (total_price < 150) total_price += 35;
-    for (const campaign of campaigns) {
-      const conditions =
-        (campaign.rule_author &&
-          campaign.rule_category &&
-          campaign.min_purchase_quantity &&
-          campaign.discount_quantity &&
-          products.filter(
-            (product) =>
-              product.author === campaign.rule_author &&
-              product.category.title === campaign.rule_category,
-          ).length >= campaign.min_purchase_quantity) ||
-        (campaign.rule_author &&
-          campaign.rule_category &&
-          campaign.min_purchase_quantity &&
-          campaign.discount_percent &&
-          products.filter(
-            (product) =>
-              product.author === campaign.rule_author &&
-              product.category.title === campaign.rule_category,
-          ).length >= campaign.min_purchase_quantity) ||
-        (campaign.rule_category &&
-          !campaign.rule_author &&
-          campaign.min_purchase_quantity &&
-          campaign.discount_quantity &&
-          products.filter(
-            (product) => product.category.title === campaign.rule_category,
-          ).length >= campaign.min_purchase_quantity) ||
-        (campaign.rule_author &&
-          !campaign.rule_category &&
-          campaign.min_purchase_quantity &&
-          campaign.discount_quantity &&
-          products.filter((product) => product.author === campaign.rule_author)
-            .length >= campaign.min_purchase_quantity) ||
-        (campaign.rule_category &&
-          !campaign.rule_author &&
-          campaign.min_purchase_quantity &&
-          campaign.discount_percent &&
-          products.filter(
-            (product) => product.category.title === campaign.rule_category,
-          ).length >= campaign.min_purchase_quantity) ||
-        (campaign.rule_author &&
-          !campaign.rule_category &&
-          campaign.min_purchase_quantity &&
-          campaign.discount_percent &&
-          products.filter((product) => product.author === campaign.rule_author)
-            .length >= campaign.min_purchase_quantity) ||
-        (campaign.min_purchase_quantity &&
-          campaign.discount_quantity &&
-          !campaign.rule_category &&
-          !campaign.rule_author &&
-          products.length >= campaign.min_purchase_quantity) ||
-        (campaign.min_purchase_quantity &&
-          campaign.discount_percent &&
-          !campaign.rule_category &&
-          !campaign.rule_author &&
-          products.length >= campaign.min_purchase_quantity) ||
-        (campaign.min_purchase_price &&
-          products.reduce((sum, product) => sum + product.list_price, 0) >=
-            campaign.min_purchase_price);
+    if (total_price < 150) total_price += shipping_cost;
 
-      if (conditions) {
-        if (campaign.discount_percent != null) {
-          available_campaigns.push({
-            id: campaign.id,
-            discount_percent: campaign.discount_percent,
-            rule_author: campaign.rule_author,
-            rule_category: campaign.rule_category,
-          });
-        } else if (campaign.discount_quantity != null) {
-          available_campaigns.push({
-            id: campaign.id,
-            discount_quantity: campaign.discount_quantity,
-            rule_author: campaign.rule_author,
-            rule_category: campaign.rule_category,
-          });
-        }
-      }
-    }
-    console.log(available_campaigns);
-
-    function get_discounted_total_price(campaign) {
-      if (campaign.discount_percent != null) {
-        const discounted_price =
-          total_price - (total_price * campaign.discount_percent) / 100;
-        return discounted_price;
-      } else if (campaign.discount_quantity != null) {
-        const { rule_author, rule_category, discount_quantity } = campaign;
-
-        const eligible_products = products
-          .filter(
-            (product) =>
-              (!rule_author || product.author === rule_author) &&
-              (!rule_category || product.category.title === rule_category),
-          )
-          .sort((a, b) => a.list_price - b.list_price)
-          .slice(0, discount_quantity);
-
-        console.log(eligible_products);
-        const discounted_price =
-          total_price -
-          eligible_products.reduce(
-            (sum, product) => sum + product.list_price,
-            0,
-          );
-
-        return discounted_price;
-      } else return 0;
-    }
+    let available_campaigns = get_available_campaigns(campaigns, products);
 
     const discounted_prices = [];
 
     for (const campaign of available_campaigns) {
-      const discounted_price = get_discounted_total_price(campaign);
+      const discounted_price = get_discounted_total_price(
+        campaign,
+        products,
+        total_price,
+      );
       discounted_prices.push({
         campaign_id: campaign.id,
         discounted_price: discounted_price,
@@ -202,7 +165,7 @@ export class OrderController {
       };
     }
 
-    const order = await this.prisma.order.create({
+    const order = {
       data: {
         price_without_discount: total_price,
         discounted_price: min_discounted_campaign.discounted_price,
@@ -215,6 +178,16 @@ export class OrderController {
         },
       },
       include: {
+        user: {
+          select: {
+            username: true,
+          },
+        },
+        campaign: {
+          select: {
+            description: true,
+          },
+        },
         products: {
           include: {
             category: {
@@ -224,26 +197,49 @@ export class OrderController {
             },
           },
         },
+      },
+    };
+    const order_queue = await this.queue.add('processOrder', order);
+    return order_queue.finished();
+  }
+  @Get(':id')
+  async getOrder(@Param('id') id: number): Promise<Order | null> {
+    return this.prisma.order.findUnique({
+      where: { id: Number(id) },
+      include: {
+        user: {
+          select: {
+            username: true,
+          },
+        },
         campaign: {
           select: {
             description: true,
           },
         },
+        products: {
+          include: {
+            category: {
+              select: {
+                title: true,
+              },
+            },
+          },
+        },
       },
     });
-
-    return order;
-  }
-  @Get(':id')
-  async getOrder(@Param('id') id: number): Promise<Order | null> {
-    return this.OrderService.getOrder(id);
   }
   @Put(':id')
   async Update(@Param('id') id: number): Promise<Order> {
-    return this.OrderService.updateOrder(id);
+    return this.prisma.order.update({
+      where: { id: Number(id) },
+      data: {},
+    });
   }
   @Delete(':id')
   async Delete(@Param('id') id: number): Promise<Order> {
-    return this.OrderService.deleteOrder(id);
+    return this.prisma.order.delete({
+      where: { id: Number(id) },
+    });
   }
 }
