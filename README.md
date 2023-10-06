@@ -25,7 +25,7 @@ $ npx prisma migrate reset
 ## Running the app
 
 ```bash
-$ npm start
+$ npm run start:prod
 ```
 
 ## Using
