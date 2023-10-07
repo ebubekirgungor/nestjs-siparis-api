@@ -64,3 +64,9 @@ GET /api/campaigns
 ```
 GET /api/users
 ```
+
+- Get a user by id
+
+```
+GET /api/users/{id}
+```
