@@ -61,14 +61,14 @@ function get_available_campaigns(campaigns, products) {
           campaign.min_purchase_price);
 
     if (conditions) {
-      if (campaign.discount_percent != null) {
+      if (campaign.discount_percent) {
         available_campaigns.push({
           id: campaign.id,
           discount_percent: campaign.discount_percent,
           rule_author: campaign.rule_author,
           rule_category: campaign.rule_category,
         });
-      } else if (campaign.discount_quantity != null) {
+      } else {
         available_campaigns.push({
           id: campaign.id,
           discount_quantity: campaign.discount_quantity,
@@ -82,11 +82,11 @@ function get_available_campaigns(campaigns, products) {
 }
 
 function get_discounted_total_price(campaign, products, total_price) {
-  if (campaign.discount_percent != null) {
+  if (campaign.discount_percent) {
     const discounted_price =
       total_price - (total_price * campaign.discount_percent) / 100;
     return discounted_price;
-  } else if (campaign.discount_quantity != null) {
+  } else {
     const { rule_author, rule_category, discount_quantity } = campaign;
 
     const eligible_products = products
