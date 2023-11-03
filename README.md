@@ -1,5 +1,6 @@
 # Book order api written in Nest.js
 
+For Rust version: https://github.com/ebubekirgungor/rust-order-api
 ## Installation
 
 - Clone repository
