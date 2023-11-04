@@ -1,4 +1,4 @@
-# Book order api written in Nest.js
+# Book order api written in Nest.js & Prisma
 
 For Rust version: https://github.com/ebubekirgungor/rust-order-api
 ## Installation
